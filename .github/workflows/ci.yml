@@ -1,0 +1,160 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 8
+        
+    - name: Get pnpm store directory
+      shell: bash
+      run: |
+        echo "STORE_DIR=$(pnpm store path --silent)" >> $GITHUB_ENV
+        
+    - name: Setup pnpm cache
+      uses: actions/cache@v3
+      with:
+        path: ${{ env.STORE_DIR }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
+          
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+      
+    - name: Run tests
+      run: pnpm test
+      
+    - name: Build
+      run: pnpm run build
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist-${{ matrix.node-version }}
+        path: dist/
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        registry-url: 'https://registry.npmjs.org'
+        
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 8
+        
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+        
+    - name: Extract version from tag
+      id: extract_version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        # v 접두사 제거 (v1.0.0 -> 1.0.0)
+        CLEAN_VERSION=${VERSION#v}
+        echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
+        echo "tag_version=$VERSION" >> $GITHUB_OUTPUT
+        echo "clean_version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
+        
+    - name: Validate version format
+      run: |
+        CLEAN_VERSION="${{ steps.extract_version.outputs.version }}"
+        if [[ ! $CLEAN_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$ ]]; then
+          echo "❌ Invalid version format: $CLEAN_VERSION"
+          echo "Version must follow semantic versioning (e.g., 1.0.0, 2.1.0-beta.1)"
+          exit 1
+        fi
+        echo "✅ Valid version format: $CLEAN_VERSION"
+        
+    - name: Check current package.json version
+      id: current_version
+      run: |
+        CURRENT_VERSION=$(node -p "require('./package.json').version")
+        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        echo "Current package.json version: $CURRENT_VERSION"
+        echo "Tag version: ${{ steps.extract_version.outputs.version }}"
+        
+    - name: Validate version compatibility
+      run: |
+        CURRENT_VERSION="${{ steps.current_version.outputs.current_version }}"
+        TAG_VERSION="${{ steps.extract_version.outputs.version }}"
+        
+        # 태그 버전이 현재 버전보다 낮으면 에러
+        if [ "$(printf '%s\n' "$CURRENT_VERSION" "$TAG_VERSION" | sort -V | head -n1)" != "$TAG_VERSION" ]; then
+          echo "❌ Tag version $TAG_VERSION is lower than current package.json version $CURRENT_VERSION"
+          echo "This would cause a version downgrade, which is not allowed."
+          echo "Please use a higher version number or update package.json first."
+          exit 1
+        fi
+        
+        echo "✅ Version compatibility check passed"
+        
+    - name: Update package.json version
+      run: |
+        pnpm version ${{ steps.extract_version.outputs.version }} --no-git-tag-version
+        echo "Updated package.json to version ${{ steps.extract_version.outputs.version }}"
+        
+    - name: Build
+      run: pnpm run build
+      
+    - name: Publish to npm
+      run: pnpm publish --no-git-checks
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ steps.extract_version.outputs.version }}
+        body: |
+          ## What's Changed
+          
+          - Automated release for version ${{ steps.extract_version.outputs.version }}
+          
+          ## Installation
+          
+          ```bash
+          npm install mcp-markdown-rules@${{ steps.extract_version.outputs.version }}
+          ```
+          
+          ## Usage
+          
+          ```bash
+          npx mcp-markdown-rules
+          ```
+        draft: false
+        prerelease: false

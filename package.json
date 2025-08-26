@@ -1,0 +1,89 @@
+{
+  "name": "mcp-markdown-rules",
+  "version": "0.1.0",
+  "description": "MCP server for project rules",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "mcp-markdown-rules": "./dist/index.js"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "package.json",
+    "docs/"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "rules",
+    "guidelines",
+    "documentation",
+    "server",
+    "cli",
+    "markdown"
+  ],
+  "author": "Minchul Kwon",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mstorm/mcp-markdown-rules.git"
+  },
+  "homepage": "https://github.com/mstorm/mcp-markdown-rules#readme",
+  "bugs": {
+    "url": "https://github.com/mstorm/mcp-markdown-rules/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vite build",
+    "build:clean": "rm -rf dist && vite build",
+    "build:tsc": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts --keyboard --watch",
+    "dev:watch": "tsx src/index.ts --watch",
+    "dev:keyboard": "tsx src/index.ts --keyboard",
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "clean": "rm -rf dist",
+    "prebuild": "pnpm run clean",
+    "prepublishOnly": "pnpm run clean && pnpm run build && pnpm test",
+    "prepare": "husky install",
+    "pre-tag": "node scripts/validate-version.js"
+  },
+  "lint-staged": {
+    "*.{js,ts,md}": [
+      "prettier --write",
+      "eslint --fix"
+    ]
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.41.0",
+    "@typescript-eslint/parser": "^8.41.0",
+    "eslint": "^9.34.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.5",
+    "prettier": "^3.6.2",
+    "tsx": "^4.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^5.0.0",
+    "vite-plugin-dts": "^4.0.0",
+    "vitest": "^3.0.0"
+  }
+}

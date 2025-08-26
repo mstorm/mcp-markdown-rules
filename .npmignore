@@ -1,0 +1,20 @@
+# Source code (not needed in distribution)
+src/
+tsconfig.json
+vite.config.ts
+vitest.config.ts
+
+# Development files
+rules/
+.github/
+.vscode/
+
+# Build and test files
+*.test.ts
+*.test.js
+__tests__/
+
+# Development dependencies and configs
+.npmrc
+.eslintrc*
+.prettierrc*
