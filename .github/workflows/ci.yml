@@ -75,7 +75,7 @@ jobs:
         version: 8
         
     - name: Install dependencies
-      run: pnpm install --frozen-lockfile
+      run: pnpm install
         
     - name: Extract version from tag
       id: extract_version
