@@ -81,7 +81,7 @@ jobs:
       id: extract_version
       run: |
         VERSION=${GITHUB_REF#refs/tags/}
-        # v 접두사 제거 (v1.0.0 -> 1.0.0)
+        # Remove 'v' prefix (v1.0.0 -> 1.0.0)
         CLEAN_VERSION=${VERSION#v}
         echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
         echo "tag_version=$VERSION" >> $GITHUB_OUTPUT
@@ -110,7 +110,7 @@ jobs:
         CURRENT_VERSION="${{ steps.current_version.outputs.current_version }}"
         TAG_VERSION="${{ steps.extract_version.outputs.version }}"
         
-        # 태그 버전이 현재 버전보다 낮으면 에러
+        # Error if tag version is lower than current version
         if [ "$(printf '%s\n' "$CURRENT_VERSION" "$TAG_VERSION" | sort -V | head -n1)" != "$TAG_VERSION" ]; then
           echo "❌ Tag version $TAG_VERSION is lower than current package.json version $CURRENT_VERSION"
           echo "This would cause a version downgrade, which is not allowed."
@@ -122,8 +122,15 @@ jobs:
         
     - name: Update package.json version
       run: |
-        pnpm version ${{ steps.extract_version.outputs.version }} --no-git-tag-version
-        echo "Updated package.json to version ${{ steps.extract_version.outputs.version }}"
+        CURRENT_VERSION=$(node -p "require('./package.json').version")
+        TAG_VERSION="${{ steps.extract_version.outputs.version }}"
+        
+        if [ "$CURRENT_VERSION" != "$TAG_VERSION" ]; then
+          pnpm version $TAG_VERSION --no-git-tag-version
+          echo "Updated package.json from $CURRENT_VERSION to $TAG_VERSION"
+        else
+          echo "Package.json version $CURRENT_VERSION already matches tag version $TAG_VERSION"
+        fi
         
     - name: Build
       run: pnpm run build
@@ -133,28 +140,14 @@ jobs:
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         
-    - name: Create Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ steps.extract_version.outputs.version }}
-        body: |
-          ## What's Changed
-          
-          - Automated release for version ${{ steps.extract_version.outputs.version }}
-          
-          ## Installation
-          
-          ```bash
-          npm install mcp-markdown-rules@${{ steps.extract_version.outputs.version }}
-          ```
-          
-          ## Usage
-          
-          ```bash
-          npx mcp-markdown-rules
-          ```
-        draft: false
-        prerelease: false
+    - name: Release Summary
+      run: |
+        echo "🎉 Release ${{ steps.extract_version.outputs.version }} completed successfully!"
+        echo "📦 Package published to npm: mcp-markdown-rules@${{ steps.extract_version.outputs.version }}"
+        echo "🔗 GitHub tag: ${{ github.ref }}"
+        echo ""
+        echo "## Installation"
+        echo "npm install mcp-markdown-rules@${{ steps.extract_version.outputs.version }}"
+        echo ""
+        echo "## Usage"
+        echo "npx mcp-markdown-rules"
