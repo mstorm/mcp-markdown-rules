@@ -122,8 +122,15 @@ jobs:
         
     - name: Update package.json version
       run: |
-        pnpm version ${{ steps.extract_version.outputs.version }} --no-git-tag-version
-        echo "Updated package.json to version ${{ steps.extract_version.outputs.version }}"
+        CURRENT_VERSION=$(node -p "require('./package.json').version")
+        TAG_VERSION="${{ steps.extract_version.outputs.version }}"
+        
+        if [ "$CURRENT_VERSION" != "$TAG_VERSION" ]; then
+          pnpm version $TAG_VERSION --no-git-tag-version
+          echo "Updated package.json from $CURRENT_VERSION to $TAG_VERSION"
+        else
+          echo "Package.json version $CURRENT_VERSION already matches tag version $TAG_VERSION"
+        fi
         
     - name: Build
       run: pnpm run build
